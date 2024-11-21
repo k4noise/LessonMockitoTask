@@ -16,7 +16,6 @@ class ShoppingServiceTest {
      * Экземпляр DAO для товаров
      */
     private final ProductDao productDao = Mockito.mock(ProductDao.class);
-
     /**
      * Экземпляр сервиса покупок
      */
@@ -44,13 +43,6 @@ class ShoppingServiceTest {
 
     /**
      * Нет смысла тестировать элементарный геттер без логики,
-     * так как ответственность за создание корзины лежит на Cart
-     */
-    @Test
-    public void testGetCart() { }
-
-    /**
-     * Нет смысла тестировать элементарный геттер без логики,
      * так как ответственность за выдачу продуктов лежит на DAO
      */
     @Test
@@ -64,12 +56,25 @@ class ShoppingServiceTest {
     public void testGetProductName() { }
 
     /**
-     * Тестирование покупки пустой корзины
+     * Тестирование получения корзины покупателя
      */
     @Test
-    public void testBuyEmptyCart() throws BuyException {
-        boolean buyResult = shoppingService.buy(cart);
-        Assertions.assertFalse(buyResult);
+    public void testGetCart() {
+        cart.add(product, 5);
+        Cart userCart = shoppingService.getCart(customer);
+
+        Assertions.assertEquals(1, userCart.getProducts().size());
+        Assertions.assertTrue(userCart.getProducts().containsKey(product));
+        Assertions.assertEquals(5, userCart.getProducts().get(product));
+    }
+
+    /**
+     * Тестирование покупки пустой и null корзины
+     */
+    @Test
+    public void testBuyEmptyNullCart() throws BuyException {
+        Assertions.assertFalse(shoppingService.buy(cart));
+        Assertions.assertFalse(shoppingService.buy(null));
     }
 
     /**
@@ -88,6 +93,7 @@ class ShoppingServiceTest {
         Mockito.verify(productDao, Mockito.times(1)).save(anotherProduct);
         Assertions.assertEquals(3, product.getCount());
         Assertions.assertEquals(4, anotherProduct.getCount());
+        Assertions.assertEquals(0, cart.getProducts().size());
     }
 
     /**
@@ -101,6 +107,21 @@ class ShoppingServiceTest {
         Assertions.assertTrue(buyResult);
         Mockito.verify(productDao, Mockito.times(1)).save(product);
         Assertions.assertEquals(0, product.getCount());
+        Assertions.assertEquals(0, cart.getProducts().size());
+    }
+
+    /**
+     * Тестирование покупки товара с отрицательным количеством
+     */
+    @Test
+    public void testBuyCartWithNegativeProductCount() throws BuyException {
+        cart.add(product, -3);
+        boolean buyResult = shoppingService.buy(cart);
+
+        Assertions.assertFalse(buyResult);
+        Mockito.verify(productDao, Mockito.times(0)).save(product);
+        Assertions.assertEquals(5, product.getCount());
+        Assertions.assertEquals(1, cart.getProducts().size());
     }
 
     /**
@@ -112,10 +133,15 @@ class ShoppingServiceTest {
 
         boolean buyResult = shoppingService.buy(cart);
         Assertions.assertTrue(buyResult);
+        Assertions.assertEquals(0, cart.getProducts().size());
+
+        Cart newCart = new Cart(customer);
+        newCart.add(product, 3);
 
         BuyException exception = Assertions.assertThrows(BuyException.class, () -> shoppingService.buy(cart));
         Assertions.assertEquals("В наличии нет необходимого количества товара '123'", exception.getMessage());
         Mockito.verify(productDao, Mockito.times(1)).save(Mockito.eq(product));
         Assertions.assertEquals(2, product.getCount());
+        Assertions.assertEquals(1, cart.getProducts().size());
     }
 }
